@@ -20,14 +20,26 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Run Auto-Streak Keeper
-        uses: SalwynC/auto-streak-keeper@main
-        with:
-          file-path: "public/auto-streak/data.txt"
-          min-commits: 2
-          max-commits: 5
-          commit-message: "Daily streak maintenance"
-          user-name: "SalwynC"
-          user-email: "11d24salwynchrist@gmail.com"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          branch-name: "main"
+      - name: Update streak file
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p public/auto-streak
+          date -u +"%Y-%m-%dT%H:%M:%SZ" >> public/auto-streak/data.txt
+
+      - name: Commit and push changes
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name "SalwynC"
+          git config user.email "11d24salwynchrist@gmail.com"
+          git add public/auto-streak/data.txt
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Daily streak maintenance"
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push origin HEAD:main
