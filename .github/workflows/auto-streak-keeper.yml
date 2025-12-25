@@ -3,7 +3,6 @@ name: Maintain GitHub Streak
 on:
   schedule:
     - cron: "30 18 * * *" # 00:00 IST daily (UTC+5:30)
-    - cron: "30 6 * * *"  # 12:00 IST daily (UTC+5:30)
   workflow_dispatch:
   push:
     branches: [ main ]
