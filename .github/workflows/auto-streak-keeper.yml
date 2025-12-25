@@ -21,13 +21,10 @@ jobs:
          node-version: "20"
 
      - name: Run Auto-Streak Keeper
-       uses: SalwynC/auto-streak-keeper@main
-       with:
-         file-path: "public/auto-streak/data.txt"
-         min-commits: 2
-         max-commits: 5
-         commit-message: "Daily streak maintenance"
-         user-name: "SalwynC"
-         user-email: "11d24salwynchrist@gmail.com"
-         github-token: ${{ secrets.GITHUB_TOKEN }}
-         branch-name: "main"
+       run: |
+         git config --global user.name "SalwynC"
+         git config --global user.email "11d24salwynchrist@gmail.com"
+         echo "$(date)" >> public/auto-streak/data.txt
+         git add public/auto-streak/data.txt
+         git commit -m "Daily streak maintenance" || echo "No changes to commit"
+         git push origin main
