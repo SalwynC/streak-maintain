@@ -2,7 +2,8 @@ name: Maintain GitHub Streak
 
 on:
   schedule:
-    - cron: "30 18 * * *" # Runs daily at 00:00 IST (UTC+5:30)
+    - cron: "30 18 * * *" # 00:00 IST (UTC+5:30)
+    - cron: "0 18 * * *"  # 23:30 IST (UTC+5:30)
   workflow_dispatch:
 
 jobs:
@@ -15,19 +16,36 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
+      - name: Prepare IST timezone
+        run: echo "TZ=Asia/Kolkata" >> $GITHUB_ENV
+
+      - name: Randomize start within 15 minutes
+        run: |
+          sleep $((RANDOM % 900))
+
+      - name: Check if commit exists today (IST)
+        id: streak
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          TODAY_IST=$(date +'%Y-%m-%d')
+          if git log origin/main --since "${TODAY_IST} 00:00:00" --until "${TODAY_IST} 23:59:59" --pretty='%an|%ai' | grep -i 'SalwynC' > /dev/null; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Update streak file
+        if: steps.streak.outputs.skip == 'false'
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p public/auto-streak
-          date -u +"%Y-%m-%dT%H:%M:%SZ" >> public/auto-streak/data.txt
+          echo "$(date +'%Y-%m-%dT%H:%M:%S%z') — routine update" >> public/auto-streak/data.txt
 
       - name: Commit and push changes
+        if: steps.streak.outputs.skip == 'false'
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -36,10 +54,8 @@ jobs:
           git config user.name "SalwynC"
           git config user.email "11d24salwynchrist@gmail.com"
           git add public/auto-streak/data.txt
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-            exit 0
-          fi
-          git commit -m "Daily streak maintenance"
+          msgs=("Update docs" "Routine update" "Minor changes" "Tidy files" "Sync content")
+          msg=${msgs[$RANDOM % ${#msgs[@]}]}
+          git commit -m "$msg"
           git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git push origin HEAD:main
