@@ -2,9 +2,14 @@ name: Maintain GitHub Streak
 
 on:
   schedule:
-    - cron: "30 18 * * *" # 00:00 IST (UTC+5:30)
-    - cron: "0 18 * * *"  # 23:30 IST (UTC+5:30)
+    - cron: "30 18 * * *" # 00:00 IST daily (UTC+5:30)
+    - cron: "30 6 * * *"  # 12:00 IST daily (UTC+5:30)
   workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'public/auto-streak/data.txt'
+      - '.github/workflows/auto-streak-keeper.yml'
 
 jobs:
   auto-streak:
@@ -15,47 +20,35 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
 
-      - name: Prepare IST timezone
-        run: echo "TZ=Asia/Kolkata" >> $GITHUB_ENV
+      # Node.js setup is not needed for inline bash steps; remove for speed
 
-      - name: Randomize start within 15 minutes
-        run: |
-          sleep $((RANDOM % 900))
-
-      - name: Check if commit exists today (IST)
-        id: streak
+      - name: Update streak file (IST)
         shell: bash
-        run: |
-          set -euo pipefail
-          git fetch origin main
-          TODAY_IST=$(date +'%Y-%m-%d')
-          if git log origin/main --since "${TODAY_IST} 00:00:00" --until "${TODAY_IST} 23:59:59" --pretty='%an|%ai' | grep -i 'SalwynC' > /dev/null; then
-            echo "skip=true" >> $GITHUB_OUTPUT
-          else
-            echo "skip=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Update streak file
-        if: steps.streak.outputs.skip == 'false'
-        shell: bash
+        env:
+          TZ: Asia/Kolkata
         run: |
           set -euo pipefail
           mkdir -p public/auto-streak
-          echo "$(date +'%Y-%m-%dT%H:%M:%S%z') — routine update" >> public/auto-streak/data.txt
+          date +"%Y-%m-%d %H:%M:%S %Z" >> public/auto-streak/data.txt
 
       - name: Commit and push changes
-        if: steps.streak.outputs.skip == 'false'
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PAT_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
         run: |
           set -euo pipefail
           git config user.name "SalwynC"
           git config user.email "11d24salwynchrist@gmail.com"
           git add public/auto-streak/data.txt
-          msgs=("Update docs" "Routine update" "Minor changes" "Tidy files" "Sync content")
-          msg=${msgs[$RANDOM % ${#msgs[@]}]}
-          git commit -m "$msg"
-          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git push origin HEAD:main
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Daily streak maintenance"
+          TOKEN="${PAT_TOKEN:-$GITHUB_TOKEN}"
+          git push "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main
